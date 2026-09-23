@@ -3,10 +3,12 @@
 import * as z from "zod";
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
+import type { Prisma } from "@/generated/prisma/client";
 import { EstadoEnvio } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { requerirUsuario, ROLES_GESTION } from "@/lib/dal";
 import { generarCodigo, transicionesEnvio } from "@/lib/envios";
+import { desdeInputFechaHora } from "@/lib/format";
 import { ESTADO_ENVIO } from "@/lib/labels";
 import {
   checkbox,
@@ -82,46 +84,82 @@ export async function crearEnvio(_: EstadoForm, formData: FormData): Promise<Est
 
 const esquemaEstado = z.object({
   estado: z.enum(EstadoEnvio),
-  recibidoPor: textoOpcional,
   nota: textoOpcional,
+  repartidorId: textoOpcional,
+  entregadoPor: textoOpcional,
+  recibidoPor: textoOpcional,
+  recibidoDni: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() ? v.replace(/\D/g, "") : null),
+    z.string().regex(/^\d{7,8}$/, "DNI inválido").nullable(),
+  ),
+  fechaEntrega: textoOpcional,
 });
 
+/** Cambia el estado de un envío. Lo usan la gestión y el chofer repartidor. */
 export async function cambiarEstadoEnvio(id: string, _: EstadoForm, formData: FormData): Promise<EstadoForm> {
-  const usuario = await requerirUsuario(ROLES_GESTION);
+  const usuario = await requerirUsuario();
   const envio = await db.envio.findUnique({ where: { id } });
   if (!envio) notFound();
+  const permitidas = transicionesEnvio(envio, usuario);
+  // Un chofer sin repartos asignados no debe saber que el envío existe
+  if (usuario.rol === "CHOFER" && permitidas.length === 0) notFound();
 
   const valores = datosForm(formData);
   const r = esquemaEstado.safeParse(valores);
   if (!r.success) return errorValidacion(r.error, valores);
-  const { estado, recibidoPor, nota } = r.data;
+  const { estado, nota } = r.data;
+  if (!permitidas.includes(estado)) return { mensaje: "Ese cambio de estado no está permitido.", valores };
 
-  if (!transicionesEnvio(envio).includes(estado)) {
-    return { mensaje: "Ese cambio de estado no está permitido.", valores };
+  const errores: Record<string, string[]> = {};
+  const datos: Prisma.EnvioUpdateInput = { estado };
+
+  if (estado === "EN_REPARTO") {
+    const repartidor = r.data.repartidorId
+      ? await db.chofer.findFirst({ where: { id: r.data.repartidorId, activo: true } })
+      : null;
+    if (!repartidor) errores.repartidorId = ["Elegí quién sale a repartir"];
+    else datos.repartidor = { connect: { id: repartidor.id } };
   }
-  if (estado === "ENTREGADO" && !recibidoPor) {
-    return { errores: { recibidoPor: ["Indicá quién recibió el envío"] }, valores };
+
+  if (estado === "ENTREGADO") {
+    const cuando = r.data.fechaEntrega ? desdeInputFechaHora(r.data.fechaEntrega) : new Date();
+    // El chofer siempre figura como quien entregó
+    const entregadoPor = usuario.rol === "CHOFER" ? usuario.nombre : r.data.entregadoPor;
+    if (!r.data.recibidoPor) errores.recibidoPor = ["Indicá quién recibió el envío"];
+    if (!r.data.recibidoDni) errores.recibidoDni = ["Indicá el DNI de quien recibió"];
+    if (!entregadoPor) errores.entregadoPor = ["Indicá quién entregó el envío"];
+    if (!cuando) errores.fechaEntrega = ["Fecha y hora inválidas"];
+    else if (cuando.getTime() > Date.now() + 5 * 60_000) errores.fechaEntrega = ["No puede ser una fecha futura"];
+    // El input trabaja en minutos: se tolera el minuto de la recepción
+    else if (cuando.getTime() < envio.createdAt.getTime() - 60_000) errores.fechaEntrega = ["Es anterior a la recepción del envío"];
+    Object.assign(datos, { entregadoPor, recibidoPor: r.data.recibidoPor, recibidoDni: r.data.recibidoDni, fechaEntrega: cuando });
   }
+
+  if (estado === "EN_DESTINO") {
+    // Reparto fallido: vuelve al depósito y queda libre para reasignar
+    datos.repartidor = { disconnect: true };
+  }
+
+  if (Object.keys(errores).length) return { errores, mensaje: "Revisá los campos marcados.", valores };
 
   await db.envio.update({
     where: { id },
     data: {
-      estado,
-      ...(estado === "ENTREGADO" && { recibidoPor, fechaEntrega: new Date() }),
+      ...datos,
       eventos: {
         create: {
           estado,
-          nota,
+          nota: nota ?? (estado === "EN_DESTINO" && envio.estado === "EN_REPARTO" ? "No se pudo entregar: volvió al depósito" : null),
           usuarioId: usuario.id,
-          // Mientras está en el depósito de destino, el evento se ubica ahí
+          // Fecha real de la entrega, aunque se registre después
+          ...(estado === "ENTREGADO" && datos.fechaEntrega instanceof Date && { createdAt: datos.fechaEntrega }),
           depositoId: estado === "CANCELADO" ? envio.depositoOrigenId : estado === "EN_DESTINO" ? envio.depositoDestinoId : null,
         },
       },
     },
   });
 
-  revalidatePath("/envios");
-  revalidatePath(`/envios/${id}`);
+  revalidatePath("/", "layout");
   return { ok: true, mensaje: `Estado actualizado a «${ESTADO_ENVIO[estado][0]}».` };
 }
 

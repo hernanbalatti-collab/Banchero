@@ -106,7 +106,7 @@ export default async function PaginaPanel() {
             detalle={`${contar((g) => g.estado === "RECIBIDO" && g.depositoOrigenId === d.id)} por despachar · ${contar(
               (g) => g.estado === "EN_DESTINO" && g.depositoDestinoId === d.id,
             )} para entregar`}
-            href={`/envios?deposito=${d.id}`}
+            href={`/depositos?deposito=${d.id}`}
           />
         ))}
         <Kpi

@@ -61,7 +61,14 @@ export default async function PaginaEnvios({ searchParams }: PageProps<"/envios"
       <Encabezado
         titulo="Envíos"
         subtitulo="Encomiendas entre los depósitos de Chivilcoy y CABA"
-        acciones={<BotonLink href="/envios/nuevo">Recibir envío</BotonLink>}
+        acciones={
+          <>
+            <BotonLink href="/envios/entregas" variante="secundario">
+              Registro de entregas
+            </BotonLink>
+            <BotonLink href="/envios/nuevo">Recibir envío</BotonLink>
+          </>
+        }
       />
       <Tarjeta sinPadding>
         <Filtros>

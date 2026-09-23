@@ -4,7 +4,8 @@ Aplicación web de Expreso Banchero: fletes, encomiendas entre
 depósitos (Chivilcoy ⇄ CABA), flota, choferes, clientes, facturación y reportes.
 Los clientes siguen sus envíos en una página pública, sin cuenta.
 
-**Stack:** Next.js 16 (App Router, server actions) · Prisma 7 + SQLite · Tailwind 4 · zod.
+**Stack:** Next.js 16 (App Router, server actions) · Prisma 7 + SQLite/libSQL (Turso en
+producción) · Tailwind 4 · zod.
 
 ## Puesta en marcha
 
@@ -38,6 +39,13 @@ Usuarios del seed:
   (ej. `K7PM-X3QA`) con comprobante imprimible. Se cargan en un viaje entre depósitos y
   acompañan al viaje: salen con él, quedan en el depósito de destino cuando llega, y desde
   ahí se marcan en reparto (si son a domicilio) y entregados (con quién recibió).
+- **Depósitos**: qué paquetes hay en cada depósito (por despachar y para entregar o
+  retirar), cuántos días llevan, cuáles están en reparto y con quién. Se imprime como
+  planilla para el control físico del stock.
+- **Entregas**: al salir a reparto se asigna el chofer, que ve sus repartos en «Mis viajes»
+  y registra la entrega desde el celular. Cada entrega guarda fecha y hora, quién entregó,
+  quién recibió (nombre y DNI) y quién la registró. El **Registro de entregas** filtra por
+  período y depósito y se exporta a Excel (CSV).
 - **Seguimiento público** (`/seguimiento`): el cliente ingresa el código y ve en qué etapa
   está su paquete. No muestra precios, notas internas ni el apellido del destinatario.
 - **Clientes, Vehículos, Choferes**: altas y ediciones con validación de CUIT, patente y DNI.
@@ -47,6 +55,34 @@ Usuarios del seed:
 - **Reportes**: ingresos, gastos y margen por mes, cliente, vehículo y chofer.
 - **Usuarios** (solo administrador): roles Administrador, Operador y Chofer. El chofer solo
   ve sus viajes y puede iniciarlos, entregarlos, registrar novedades y cargar gastos.
+
+## Publicar en Vercel + Turso
+
+La app usa el adaptador libSQL de Prisma: en desarrollo apunta al archivo
+`prisma/dev.db` y en producción a una base de [Turso](https://turso.tech).
+
+1. **Base en Turso.** Con la CLI de Turso (en Windows se instala en WSL, o usá el panel web):
+   ```bash
+   turso db create banchero
+   turso db show banchero --url        # → libsql://banchero-<usuario>.turso.io
+   turso db tokens create banchero     # → token de acceso
+   ```
+2. **Migraciones y primer administrador**, desde tu máquina (PowerShell):
+   ```powershell
+   $env:DATABASE_URL="libsql://banchero-<usuario>.turso.io"
+   $env:DATABASE_AUTH_TOKEN="<token>"
+   npm run db:migrar-remoto                                  # crea tablas y depósitos
+   npm run crear-admin -- tu@email.com "Tu Nombre"            # muestra la contraseña generada
+   ```
+   `db:migrar-remoto` se vuelve a correr cada vez que haya migraciones nuevas. **No corras
+   `db:seed` contra Turso**: borra todos los datos (el script lo impide).
+3. **Proyecto en Vercel.** En vercel.com → *Add New → Project*, importá el repositorio de
+   GitHub y cargá las variables de entorno `DATABASE_URL`, `DATABASE_AUTH_TOKEN` y
+   `SESSION_SECRET` (una nueva, distinta de la local). Deploy. Cada push a la rama
+   principal se publica solo.
+
+> El plan gratuito de Vercel (Hobby) es para uso no comercial. Para uso diario de la
+> empresa corresponde el plan Pro u otro proveedor.
 
 ## Estructura
 
@@ -60,6 +96,8 @@ src/lib/           acceso a datos (dal.ts), sesión, reglas de viajes y envíos,
 src/components/    UI compartida (formularios, tablas, gráfico)
 src/proxy.ts       redirige a /login si no hay sesión (chequeo optimista)
 scripts/probar-rutas.mjs  recorre todas las páginas con cada rol (con el servidor corriendo)
+scripts/migrar-remoto.mjs aplica las migraciones en Turso
+scripts/crear-admin.mts   crea un administrador (primer ingreso en producción)
 ```
 
 La autorización real se hace en `src/lib/dal.ts` (`requerirUsuario`), que cada página y
@@ -84,4 +122,3 @@ a partir del encabezado del sitio. Paleta y tipografías (Montserrat / Open Sans
 - Factura electrónica (ARCA) y facturación de encomiendas en cuenta corriente.
 - Aviso al destinatario por email o WhatsApp en cada cambio de estado del envío.
 - Dirección y teléfono de los depósitos (se muestran en el seguimiento para retirar).
-- Pasar a PostgreSQL para producción (cambiar el `provider` y el adapter de Prisma).

@@ -1,40 +1,42 @@
 // Recorre las páginas con cada rol y verifica códigos de respuesta.
 // Uso: con el servidor corriendo, `node scripts/probar-rutas.mjs [url-base]`
 import "dotenv/config";
-import Database from "better-sqlite3";
+import { createClient } from "@libsql/client";
 import { SignJWT } from "jose";
 
 const BASE = process.argv[2] ?? "http://localhost:3000";
-const db = new Database("prisma/dev.db", { readonly: true });
+const db = createClient({ url: process.env.DATABASE_URL, authToken: process.env.DATABASE_AUTH_TOKEN });
+const fila = async (sql, ...args) => (await db.execute({ sql, args })).rows[0];
 const clave = new TextEncoder().encode(process.env.SESSION_SECRET);
-const uno = (sql) => db.prepare(sql).get()?.id;
+const uno = async (sql) => (await fila(sql))?.id;
 
 const tokens = {};
-for (const u of db.prepare("select id, rol from Usuario").all()) {
+for (const u of (await db.execute("select id, rol from Usuario")).rows) {
   tokens[u.rol] = await new SignJWT({ userId: u.id, rol: u.rol })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("10m")
     .sign(clave);
 }
 
-const choferUsuario = db.prepare("select choferId from Usuario where rol = 'CHOFER'").get().choferId;
+const choferUsuario = (await fila("select choferId from Usuario where rol = 'CHOFER'")).choferId;
 const ids = {
-  viaje: uno("select id from Viaje where estado = 'EN_TRANSITO' and clienteId is not null"),
-  viajeLinea: uno("select id from Viaje where depositoOrigenId is not null and estado = 'ASIGNADO'"),
-  viajePropio: db.prepare("select id from Viaje where choferId = ?").get(choferUsuario)?.id,
-  viajeAjeno: db.prepare("select id from Viaje where choferId <> ?").get(choferUsuario)?.id,
-  factura: uno("select id from Factura"),
-  cliente: uno("select id from Cliente"),
-  vehiculo: uno("select id from Vehiculo"),
-  chofer: uno("select id from Chofer"),
-  usuario: uno("select id from Usuario"),
-  envio: uno("select id from Envio where estado = 'EN_DESTINO'"),
+  viaje: await uno("select id from Viaje where estado = 'EN_TRANSITO' and clienteId is not null"),
+  viajeLinea: await uno("select id from Viaje where depositoOrigenId is not null and estado = 'ASIGNADO'"),
+  viajePropio: (await fila("select id from Viaje where choferId = ?", choferUsuario))?.id,
+  viajeAjeno: (await fila("select id from Viaje where choferId <> ?", choferUsuario))?.id,
+  factura: await uno("select id from Factura"),
+  cliente: await uno("select id from Cliente"),
+  vehiculo: await uno("select id from Vehiculo"),
+  chofer: await uno("select id from Chofer"),
+  usuario: await uno("select id from Usuario"),
+  envio: await uno("select id from Envio where estado = 'EN_DESTINO'"),
 };
-const codigo = db.prepare("select codigo from Envio where estado = 'EN_TRANSITO'").get().codigo;
+const codigo = (await fila("select codigo from Envio where estado = 'EN_TRANSITO'")).codigo;
 
 const privadas = [
   "/", "/viajes", "/viajes/nuevo", `/viajes/${ids.viaje}`, `/viajes/${ids.viaje}/editar`, `/viajes/${ids.viajeLinea}`,
   "/envios", "/envios?estado=TODOS&deposito=dep_caba", "/envios/nuevo", `/envios/${ids.envio}`,
+  "/depositos", "/depositos?deposito=dep_caba", "/envios/entregas", "/envios/entregas/exportar",
   "/clientes", `/clientes/${ids.cliente}`, "/flota/vehiculos", `/flota/vehiculos/${ids.vehiculo}`,
   "/flota/choferes", `/flota/choferes/${ids.chofer}`, "/facturacion", "/facturacion/nueva", `/facturacion/${ids.factura}`,
   "/reportes", "/usuarios", `/usuarios/${ids.usuario}`, "/mis-viajes", `/viajes/${ids.viajePropio}`, `/viajes/${ids.viajeAjeno}`,

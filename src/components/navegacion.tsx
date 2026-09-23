@@ -15,6 +15,7 @@ const ITEMS: Item[] = [
   { href: "/", etiqueta: "Panel", roles: ["ADMIN", "OPERADOR"] },
   { href: "/viajes", etiqueta: "Viajes", roles: ["ADMIN", "OPERADOR"] },
   { href: "/envios", etiqueta: "Envíos", roles: ["ADMIN", "OPERADOR"] },
+  { href: "/depositos", etiqueta: "Depósitos", roles: ["ADMIN", "OPERADOR"] },
   { href: "/mis-viajes", etiqueta: "Mis viajes", roles: ["CHOFER"] },
   { href: "/clientes", etiqueta: "Clientes", roles: ["ADMIN", "OPERADOR"] },
   { href: "/flota/vehiculos", etiqueta: "Vehículos", roles: ["ADMIN", "OPERADOR"] },

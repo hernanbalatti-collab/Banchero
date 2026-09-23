@@ -1,12 +1,18 @@
 // Datos de ejemplo. Se ejecuta con `npm run db:seed` (o al hacer db:reset).
 import "dotenv/config";
 import bcrypt from "bcryptjs";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaLibSql } from "@prisma/adapter-libsql";
 import { Prisma, PrismaClient } from "../src/generated/prisma/client";
 import type { EstadoEnvio, EstadoViaje, TipoGasto } from "../src/generated/prisma/enums";
 import { generarCodigo } from "../src/lib/envios";
 
-const db = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL! }) });
+// Borra TODOS los datos antes de cargar los de ejemplo: nunca correrlo contra producción
+if (process.env.DATABASE_URL?.startsWith("libsql://")) {
+  console.error("El seed borra todos los datos: no se corre contra una base remota (Turso).");
+  process.exit(1);
+}
+
+const db = new PrismaClient({ adapter: new PrismaLibSql({ url: process.env.DATABASE_URL! }) });
 
 // Generador pseudoaleatorio con semilla: el seed da siempre los mismos datos
 let semilla = 42;
@@ -255,8 +261,11 @@ async function main() {
     if (viaje?.llega && hasta >= 2) eventos.push({ estado: "EN_DESTINO", depositoId: destino, createdAt: viaje.llega });
     const llega = viaje?.llega ?? recibido;
     if (domicilio && hasta >= 3) eventos.push({ estado: "EN_REPARTO", depositoId: null, createdAt: new Date(llega.getTime() + 15 * 3600_000) });
-    const entrega = new Date(llega.getTime() + (domicilio ? 20 : 28) * 3600_000);
+    // Nunca en el futuro respecto de cuando corre el seed
+    const entrega = new Date(Math.min(llega.getTime() + (domicilio ? 20 : 28) * 3600_000, Date.now() - 3600_000));
     if (hasta >= 4) eventos.push({ estado: "ENTREGADO", depositoId: null, createdAt: entrega });
+    // Reparto: el chofer de la línea; en el depósito entrega el personal
+    const repartidor = domicilio && hasta >= 3 ? choferLinea : null;
     const destinatario = elegir(DESTINATARIOS);
 
     await db.envio.create({
@@ -275,7 +284,10 @@ async function main() {
         pesoKg: entre(1, 60),
         precio: new Prisma.Decimal(entre(8, 45) * 1000),
         viajeId: viaje?.id,
-        recibidoPor: hasta >= 4 ? `${destinatario} (DNI ${entre(20, 45)}.${entre(100, 999)}.${entre(100, 999)})` : null,
+        repartidorId: repartidor?.id,
+        entregadoPor: hasta >= 4 ? (repartidor ? `${repartidor.nombre} ${repartidor.apellido}` : "Laura Operaciones") : null,
+        recibidoPor: hasta >= 4 ? destinatario : null,
+        recibidoDni: hasta >= 4 ? String(entre(20_000_000, 45_000_000)) : null,
         fechaEntrega: hasta >= 4 ? entrega : null,
         createdAt: recibido,
         eventos: { create: eventos.map((e) => ({ ...e, usuarioId: admin.id })) },
@@ -398,8 +410,11 @@ async function main() {
 }
 
 main()
+  .then(() => db.$disconnect())
+  // Salida explícita: en Windows el cliente nativo de libsql a veces falla
+  // al liberar recursos en el cierre natural del proceso, con los datos ya guardados
+  .then(() => process.exit(0))
   .catch((e) => {
     console.error(e);
     process.exit(1);
-  })
-  .finally(() => db.$disconnect());
+  });

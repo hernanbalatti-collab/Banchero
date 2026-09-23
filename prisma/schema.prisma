@@ -107,8 +107,9 @@ model Chofer {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  usuario Usuario?
-  viajes  Viaje[]
+  usuario  Usuario?
+  viajes   Viaje[]
+  repartos Envio[]
 }
 
 // ─── Viajes ─────────────────────────────────────────────────
@@ -247,7 +248,13 @@ model Envio {
   precio               Decimal
   viajeId              String?
   viaje                Viaje?      @relation(fields: [viajeId], references: [id])
+  // Reparto a domicilio: chofer asignado al salir del depósito
+  repartidorId         String?
+  repartidor           Chofer?     @relation(fields: [repartidorId], references: [id])
+  // Datos de la entrega
+  entregadoPor         String?
   recibidoPor          String?
+  recibidoDni          String?
   fechaEntrega         DateTime?
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
@@ -257,6 +264,8 @@ model Envio {
   @@index([estado])
   @@index([clienteId])
   @@index([viajeId])
+  @@index([repartidorId])
+  @@index([fechaEntrega])
 }
 
 model EventoEnvio {

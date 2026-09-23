@@ -1,4 +1,4 @@
-import type { EstadoEnvio } from "@/generated/prisma/enums";
+import type { EstadoEnvio, Rol } from "@/generated/prisma/enums";
 
 /** Estados que se cambian a mano. RECIBIDO → EN_TRANSITO → EN_DESTINO los mueve el viaje. */
 const TRANSICIONES: Record<EstadoEnvio, EstadoEnvio[]> = {
@@ -11,9 +11,25 @@ const TRANSICIONES: Record<EstadoEnvio, EstadoEnvio[]> = {
   CANCELADO: [],
 };
 
-export function transicionesEnvio(envio: { estado: EstadoEnvio; entregaDomicilio: boolean }) {
+export function transicionesEnvio(
+  envio: { estado: EstadoEnvio; entregaDomicilio: boolean; repartidorId?: string | null },
+  usuario?: { rol: Rol; choferId: string | null },
+) {
+  // El chofer solo cierra los repartos que tiene asignados: entregado o de vuelta al depósito
+  if (usuario?.rol === "CHOFER") {
+    const esSuyo = envio.estado === "EN_REPARTO" && !!usuario.choferId && envio.repartidorId === usuario.choferId;
+    return esSuyo ? (["ENTREGADO", "EN_DESTINO"] as EstadoEnvio[]) : [];
+  }
   return TRANSICIONES[envio.estado].filter((e) => e !== "EN_REPARTO" || envio.entregaDomicilio);
 }
+
+/** Días completos desde una fecha hasta hoy. */
+export function diasDesde(d: Date) {
+  return Math.floor((Date.now() - d.getTime()) / 86_400_000);
+}
+
+/** Paquetes con más días que esto en un depósito se marcan como demorados. */
+export const DIAS_DEMORA_DEPOSITO = 3;
 
 export const ACCION_ENVIO: Partial<Record<EstadoEnvio, string>> = {
   EN_REPARTO: "Salió a reparto",

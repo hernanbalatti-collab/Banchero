@@ -45,6 +45,19 @@ export function aInputFecha(d: Date | null | undefined) {
   return d ? d.toISOString().slice(0, 10) : "";
 }
 
+/** Valor para un <input type="datetime-local">, en hora de Argentina. */
+export function aInputFechaHora(d: Date) {
+  // sv-SE da "AAAA-MM-DD HH:MM:SS"
+  return d.toLocaleString("sv-SE", { timeZone: ZONA_AR }).slice(0, 16).replace(" ", "T");
+}
+
+/** Interpreta un "AAAA-MM-DDTHH:MM" como hora de Argentina (UTC−3, sin horario de verano). */
+export function desdeInputFechaHora(s: string) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) return null;
+  const d = new Date(`${s}:00-03:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /** Hoy a medianoche UTC, según el calendario de Argentina. */
 export function hoy() {
   const s = new Date().toLocaleDateString("en-CA", { timeZone: ZONA_AR });

@@ -4,7 +4,8 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cambiarEstadoEnvio } from "@/actions/envios";
 import { BotonImprimir } from "@/components/boton-imprimir";
-import { BotonEnviar, Entrada, Form } from "@/components/form";
+import { FormEntrega } from "@/components/form-entrega";
+import { BotonEnviar, Entrada, Form, Selector } from "@/components/form";
 import { BotonLink, Dato, Encabezado, Estado, Tarjeta } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requerirUsuario, ROLES_GESTION } from "@/lib/dal";
@@ -15,7 +16,7 @@ import { ESTADO_ENVIO } from "@/lib/labels";
 export const metadata: Metadata = { title: "Envío" };
 
 export default async function PaginaEnvio({ params }: PageProps<"/envios/[id]">) {
-  await requerirUsuario(ROLES_GESTION);
+  const usuario = await requerirUsuario(ROLES_GESTION);
   const { id } = await params;
   const envio = await db.envio.findUnique({
     where: { id },
@@ -24,6 +25,7 @@ export default async function PaginaEnvio({ params }: PageProps<"/envios/[id]">)
       depositoOrigen: true,
       depositoDestino: true,
       viaje: { select: { id: true, numero: true, estado: true } },
+      repartidor: { select: { nombre: true, apellido: true } },
       eventos: {
         orderBy: { createdAt: "desc" },
         include: { deposito: { select: { nombre: true } }, usuario: { select: { nombre: true } } },
@@ -35,6 +37,11 @@ export default async function PaginaEnvio({ params }: PageProps<"/envios/[id]">)
   const h = await headers();
   const urlSeguimiento = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}/seguimiento/${envio.codigo}`;
   const transiciones = transicionesEnvio(envio);
+  const choferes = transiciones.includes("EN_REPARTO")
+    ? await db.chofer.findMany({ where: { activo: true }, orderBy: { apellido: "asc" } })
+    : [];
+  const nombreRepartidor = envio.repartidor ? `${envio.repartidor.nombre} ${envio.repartidor.apellido}` : null;
+  const registroEntrega = envio.eventos.find((e) => e.estado === "ENTREGADO");
 
   return (
     <>
@@ -127,33 +134,65 @@ export default async function PaginaEnvio({ params }: PageProps<"/envios/[id]">)
             ) : (
               <p className="text-sm text-stone-500">—</p>
             )}
-            {envio.recibidoPor && (
+            {nombreRepartidor && envio.estado === "EN_REPARTO" && (
               <p className="mt-3 text-sm text-stone-700">
-                Recibió: <strong>{envio.recibidoPor}</strong> ({fechaHora(envio.fechaEntrega)})
+                En reparto con <strong>{nombreRepartidor}</strong>
               </p>
             )}
           </Tarjeta>
 
-          {transiciones.length > 0 && (
-            <Tarjeta titulo="Actualizar estado">
-              <Form accion={cambiarEstadoEnvio.bind(null, envio.id)} className="space-y-4">
-                {transiciones.includes("ENTREGADO") && (
-                  <Entrada name="recibidoPor" etiqueta="Recibió (nombre y DNI)" ayuda="Obligatorio para registrar la entrega." />
+          {envio.estado === "ENTREGADO" && (
+            <Tarjeta titulo="Entrega">
+              <dl className="space-y-3">
+                <Dato etiqueta="Fecha y hora">{fechaHora(envio.fechaEntrega)}</Dato>
+                <Dato etiqueta="Entregó">{envio.entregadoPor}</Dato>
+                <Dato etiqueta="Recibió">
+                  {envio.recibidoPor}
+                  {envio.recibidoDni && <span className="text-stone-500"> · DNI {envio.recibidoDni}</span>}
+                </Dato>
+                {registroEntrega?.usuario && (
+                  <Dato etiqueta="Registrado por">
+                    {registroEntrega.usuario.nombre}
+                  </Dato>
                 )}
-                <Entrada name="nota" etiqueta="Nota interna" ayuda="No se muestra en el seguimiento público." />
-                <div className="flex flex-wrap gap-2">
-                  {transiciones.map((e) => (
-                    <BotonEnviar
-                      key={e}
-                      name="estado"
-                      value={e}
-                      variante={e === "CANCELADO" ? "peligro" : e === "EN_DESTINO" ? "secundario" : "primario"}
-                      confirmar={e === "CANCELADO" ? "¿Cancelar este envío?" : undefined}
-                    >
-                      {ACCION_ENVIO[e]}
-                    </BotonEnviar>
-                  ))}
-                </div>
+              </dl>
+            </Tarjeta>
+          )}
+
+          {transiciones.includes("EN_REPARTO") && (
+            <Tarjeta titulo="Salir a reparto">
+              <Form accion={cambiarEstadoEnvio.bind(null, envio.id)} className="space-y-4">
+                <Selector
+                  name="repartidorId"
+                  etiqueta="Repartidor"
+                  vacio="Elegir…"
+                  opciones={choferes.map((c) => ({ valor: c.id, etiqueta: `${c.apellido}, ${c.nombre}` }))}
+                  ayuda="El chofer va a ver el reparto en «Mis viajes» y puede registrar la entrega."
+                />
+                <BotonEnviar name="estado" value="EN_REPARTO">
+                  {ACCION_ENVIO.EN_REPARTO}
+                </BotonEnviar>
+              </Form>
+            </Tarjeta>
+          )}
+
+          {transiciones.includes("ENTREGADO") && (
+            <Tarjeta titulo="Registrar entrega">
+              <FormEntrega
+                envioId={envio.id}
+                entregadoPor={nombreRepartidor ?? usuario.nombre}
+                enReparto={envio.estado === "EN_REPARTO"}
+              />
+            </Tarjeta>
+          )}
+
+          {transiciones.includes("CANCELADO") && (
+            <Tarjeta titulo="Cancelar">
+              <Form accion={cambiarEstadoEnvio.bind(null, envio.id)} className="space-y-4">
+                <Entrada name="nota" etiqueta="Motivo" />
+                <BotonEnviar name="estado" value="CANCELADO" variante="peligro" confirmar="¿Cancelar este envío?">
+                  {ACCION_ENVIO.CANCELADO}
+                </BotonEnviar>
               </Form>
             </Tarjeta>
           )}
