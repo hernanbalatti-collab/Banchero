@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Expreso Banchero · Gestión de Cargas
 
-## Getting Started
+Aplicación web de Expreso Banchero: fletes, encomiendas entre
+depósitos (Chivilcoy ⇄ CABA), flota, choferes, clientes, facturación y reportes.
+Los clientes siguen sus envíos en una página pública, sin cuenta.
 
-First, run the development server:
+**Stack:** Next.js 16 (App Router, server actions) · Prisma 7 + SQLite · Tailwind 4 · zod.
+
+## Puesta en marcha
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env          # completar SESSION_SECRET (el comando para generarlo está en el archivo)
+npx prisma migrate dev        # crea la base (incluye los depósitos Chivilcoy y CABA)
+npm run db:seed               # datos de ejemplo
+npm run dev                   # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Usuarios del seed:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Rol           | Email                   | Contraseña     |
+| ------------- | ----------------------- | -------------- |
+| Administrador | `admin@cargas.local`    | `admin1234`    |
+| Operador      | `operador@cargas.local` | `operador1234` |
+| Chofer        | `chofer@cargas.local`   | `chofer1234`   |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Módulos
 
-## Learn More
+- **Panel**: indicadores, viajes activos, encomiendas por depósito y vencimientos (VTV,
+  seguro, licencias, LiNTI) de los próximos 30 días.
+- **Viajes**: dos tipos.
+  - *Flete*: para un cliente, con tarifa propia; se factura.
+  - *Entre depósitos*: lleva encomiendas de varios clientes; el ingreso son las encomiendas.
+  - Estados: Pendiente → Asignado (automático al tener chofer y vehículo) → En tránsito →
+    Entregado / Cancelado. Historial de novedades con ubicación, gastos y margen por viaje.
+    Al salir y al llegar se actualiza el estado de las unidades.
+- **Envíos**: se registran al recibirlos en un depósito y generan un código de seguimiento
+  (ej. `K7PM-X3QA`) con comprobante imprimible. Se cargan en un viaje entre depósitos y
+  acompañan al viaje: salen con él, quedan en el depósito de destino cuando llega, y desde
+  ahí se marcan en reparto (si son a domicilio) y entregados (con quién recibió).
+- **Seguimiento público** (`/seguimiento`): el cliente ingresa el código y ve en qué etapa
+  está su paquete. No muestra precios, notas internas ni el apellido del destinatario.
+- **Clientes, Vehículos, Choferes**: altas y ediciones con validación de CUIT, patente y DNI.
+- **Facturación**: agrupa fletes entregados de un cliente (A/B con IVA 21 %, C sin IVA),
+  cobro y anulación (que libera los viajes). Es un comprobante interno: la factura
+  electrónica ante ARCA no está integrada.
+- **Reportes**: ingresos, gastos y margen por mes, cliente, vehículo y chofer.
+- **Usuarios** (solo administrador): roles Administrador, Operador y Chofer. El chofer solo
+  ve sus viajes y puede iniciarlos, entregarlos, registrar novedades y cargar gastos.
 
-To learn more about Next.js, take a look at the following resources:
+## Estructura
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+prisma/            schema, migraciones y seed
+src/actions/       server actions (validan con zod y verifican permisos)
+src/app/(app)/     pantallas con sesión
+src/app/seguimiento/  seguimiento público
+src/app/login/
+src/lib/           acceso a datos (dal.ts), sesión, reglas de viajes y envíos, formatos
+src/components/    UI compartida (formularios, tablas, gráfico)
+src/proxy.ts       redirige a /login si no hay sesión (chequeo optimista)
+scripts/probar-rutas.mjs  recorre todas las páginas con cada rol (con el servidor corriendo)
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+La autorización real se hace en `src/lib/dal.ts` (`requerirUsuario`), que cada página y
+cada acción llaman antes de leer o modificar datos.
 
-## Deploy on Vercel
+## Marca
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Las imágenes de `public/marca/` y los íconos de `src/app/` (`favicon.ico`, `icon.png`,
+`apple-icon.png`) vienen de expresobanchero.com. El logo se reconstruyó con colores sólidos
+a partir del encabezado del sitio. Paleta y tipografías (Montserrat / Open Sans) en
+`src/app/globals.css`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Comandos útiles
+
+- `npm run db:migrate`: aplica cambios del schema
+- `npm run db:reset`: borra la base, reaplica migraciones y corre el seed
+- `npm run db:studio`: explorador de la base
+- `node scripts/probar-rutas.mjs http://localhost:3000`: verificación rápida de páginas y permisos
+
+## Pendientes sugeridos
+
+- Factura electrónica (ARCA) y facturación de encomiendas en cuenta corriente.
+- Aviso al destinatario por email o WhatsApp en cada cambio de estado del envío.
+- Dirección y teléfono de los depósitos (se muestran en el seguimiento para retirar).
+- Pasar a PostgreSQL para producción (cambiar el `provider` y el adapter de Prisma).

@@ -1,0 +1,313 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─── Usuarios ───────────────────────────────────────────────
+
+enum Rol {
+  ADMIN
+  OPERADOR
+  CHOFER
+}
+
+model Usuario {
+  id           String   @id @default(cuid())
+  nombre       String
+  email        String   @unique
+  passwordHash String
+  rol          Rol      @default(OPERADOR)
+  activo       Boolean  @default(true)
+  // Solo para usuarios con rol CHOFER: el legajo de chofer vinculado
+  choferId     String?  @unique
+  chofer       Chofer?  @relation(fields: [choferId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  eventos      EventoViaje[]
+  eventosEnvio EventoEnvio[]
+}
+
+// ─── Clientes ───────────────────────────────────────────────
+
+enum CondicionIva {
+  RESPONSABLE_INSCRIPTO
+  MONOTRIBUTO
+  EXENTO
+  CONSUMIDOR_FINAL
+}
+
+model Cliente {
+  id           String       @id @default(cuid())
+  razonSocial  String
+  cuit         String       @unique
+  condicionIva CondicionIva @default(RESPONSABLE_INSCRIPTO)
+  email        String?
+  telefono     String?
+  direccion    String?
+  activo       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  viajes   Viaje[]
+  facturas Factura[]
+  envios   Envio[]
+}
+
+// ─── Flota ──────────────────────────────────────────────────
+
+enum TipoVehiculo {
+  CAMION
+  TRACTOR
+  SEMIRREMOLQUE
+  ACOPLADO
+  UTILITARIO
+}
+
+enum EstadoVehiculo {
+  DISPONIBLE
+  EN_VIAJE
+  MANTENIMIENTO
+  BAJA
+}
+
+model Vehiculo {
+  id                String         @id @default(cuid())
+  patente           String         @unique
+  tipo              TipoVehiculo
+  marca             String
+  modelo            String
+  anio              Int?
+  capacidadKg       Int?
+  estado            EstadoVehiculo @default(DISPONIBLE)
+  vencimientoVtv    DateTime?
+  vencimientoSeguro DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  viajes          Viaje[] @relation("VehiculoPrincipal")
+  viajesComoAcople Viaje[] @relation("Acoplado")
+}
+
+model Chofer {
+  id                  String    @id @default(cuid())
+  nombre              String
+  apellido            String
+  dni                 String    @unique
+  telefono            String?
+  categoriaLicencia   String?
+  vencimientoLicencia DateTime?
+  // Licencia Nacional de Transporte Interjurisdiccional
+  vencimientoLinti    DateTime?
+  activo              Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  usuario Usuario?
+  viajes  Viaje[]
+}
+
+// ─── Viajes ─────────────────────────────────────────────────
+
+enum EstadoViaje {
+  PENDIENTE
+  ASIGNADO
+  EN_TRANSITO
+  ENTREGADO
+  CANCELADO
+}
+
+model Viaje {
+  id                    String      @id @default(cuid())
+  numero                Int         @unique
+  estado                EstadoViaje @default(PENDIENTE)
+  // Opcional: los viajes entre depósitos llevan encomiendas de varios clientes
+  clienteId             String?
+  cliente               Cliente?    @relation(fields: [clienteId], references: [id])
+  depositoOrigenId      String?
+  depositoOrigen        Deposito?   @relation("ViajeDesde", fields: [depositoOrigenId], references: [id])
+  depositoDestinoId     String?
+  depositoDestino       Deposito?   @relation("ViajeHacia", fields: [depositoDestinoId], references: [id])
+  choferId              String?
+  chofer                Chofer?     @relation(fields: [choferId], references: [id])
+  vehiculoId            String?
+  vehiculo              Vehiculo?   @relation("VehiculoPrincipal", fields: [vehiculoId], references: [id])
+  acopladoId            String?
+  acoplado              Vehiculo?   @relation("Acoplado", fields: [acopladoId], references: [id])
+  origen                String
+  destino               String
+  fechaCarga            DateTime
+  fechaEntregaEstimada  DateTime?
+  fechaEntrega          DateTime?
+  descripcionCarga      String
+  pesoKg                Int?
+  kmEstimados           Int?
+  tarifa                Decimal
+  cartaPorte            String?
+  remito                String?
+  observaciones         String?
+  facturaId             String?
+  factura               Factura?    @relation(fields: [facturaId], references: [id])
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  eventos EventoViaje[]
+  gastos  Gasto[]
+  envios  Envio[]
+
+  @@index([estado])
+  @@index([clienteId])
+  @@index([choferId])
+  @@index([fechaCarga])
+}
+
+// Historial de seguimiento: cada cambio de estado o novedad del viaje
+model EventoViaje {
+  id        String       @id @default(cuid())
+  viajeId   String
+  viaje     Viaje        @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+  estado    EstadoViaje?
+  nota      String?
+  ubicacion String?
+  usuarioId String?
+  usuario   Usuario?     @relation(fields: [usuarioId], references: [id])
+  createdAt DateTime     @default(now())
+
+  @@index([viajeId])
+}
+
+enum TipoGasto {
+  COMBUSTIBLE
+  PEAJE
+  VIATICO
+  MANTENIMIENTO
+  OTRO
+}
+
+model Gasto {
+  id          String    @id @default(cuid())
+  viajeId     String
+  viaje       Viaje     @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+  tipo        TipoGasto
+  monto       Decimal
+  fecha       DateTime
+  descripcion String?
+  createdAt   DateTime  @default(now())
+
+  @@index([viajeId])
+}
+
+// ─── Depósitos y encomiendas ───────────────────────────────
+
+model Deposito {
+  id        String  @id
+  nombre    String  @unique
+  direccion String?
+  telefono  String?
+
+  viajesDesde   Viaje[]       @relation("ViajeDesde")
+  viajesHacia   Viaje[]       @relation("ViajeHacia")
+  enviosDesde   Envio[]       @relation("EnvioDesde")
+  enviosHacia   Envio[]       @relation("EnvioHacia")
+  eventosEnvio  EventoEnvio[]
+}
+
+enum EstadoEnvio {
+  RECIBIDO    // en el depósito de origen, esperando viaje
+  EN_TRANSITO // viajando entre depósitos
+  EN_DESTINO  // en el depósito de destino, listo para retirar o repartir
+  EN_REPARTO
+  ENTREGADO
+  CANCELADO
+}
+
+model Envio {
+  id                   String      @id @default(cuid())
+  // Código público que el cliente usa en /seguimiento
+  codigo               String      @unique
+  estado               EstadoEnvio @default(RECIBIDO)
+  clienteId            String
+  cliente              Cliente     @relation(fields: [clienteId], references: [id])
+  depositoOrigenId     String
+  depositoOrigen       Deposito    @relation("EnvioDesde", fields: [depositoOrigenId], references: [id])
+  depositoDestinoId    String
+  depositoDestino      Deposito    @relation("EnvioHacia", fields: [depositoDestinoId], references: [id])
+  destinatarioNombre   String
+  destinatarioTelefono String?
+  entregaDomicilio     Boolean     @default(false)
+  direccionEntrega     String?
+  descripcion          String
+  bultos               Int         @default(1)
+  pesoKg               Float?
+  valorDeclarado       Decimal?
+  precio               Decimal
+  viajeId              String?
+  viaje                Viaje?      @relation(fields: [viajeId], references: [id])
+  recibidoPor          String?
+  fechaEntrega         DateTime?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  eventos EventoEnvio[]
+
+  @@index([estado])
+  @@index([clienteId])
+  @@index([viajeId])
+}
+
+model EventoEnvio {
+  id         String      @id @default(cuid())
+  envioId    String
+  envio      Envio       @relation(fields: [envioId], references: [id], onDelete: Cascade)
+  estado     EstadoEnvio
+  depositoId String?
+  deposito   Deposito?   @relation(fields: [depositoId], references: [id])
+  // Nota interna: no se muestra en el seguimiento público
+  nota       String?
+  usuarioId  String?
+  usuario    Usuario?    @relation(fields: [usuarioId], references: [id])
+  createdAt  DateTime    @default(now())
+
+  @@index([envioId])
+}
+
+// ─── Facturación ────────────────────────────────────────────
+
+enum TipoFactura {
+  A
+  B
+  C
+}
+
+enum EstadoFactura {
+  EMITIDA
+  PAGADA
+  ANULADA
+}
+
+model Factura {
+  id          String        @id @default(cuid())
+  tipo        TipoFactura
+  puntoVenta  Int           @default(1)
+  numero      Int
+  clienteId   String
+  cliente     Cliente       @relation(fields: [clienteId], references: [id])
+  fecha       DateTime
+  vencimiento DateTime?
+  subtotal    Decimal
+  iva         Decimal
+  total       Decimal
+  estado      EstadoFactura @default(EMITIDA)
+  fechaPago   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  viajes Viaje[]
+
+  @@unique([tipo, puntoVenta, numero])
+  @@index([clienteId])
+}
