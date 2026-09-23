@@ -15,6 +15,7 @@ export function transicionesEnvio(
   envio: { estado: EstadoEnvio; entregaDomicilio: boolean; repartidorId?: string | null },
   usuario?: { rol: Rol; choferId: string | null },
 ) {
+  if (usuario?.rol === "CLIENTE") return [];
   // El chofer solo cierra los repartos que tiene asignados: entregado o de vuelta al depósito
   if (usuario?.rol === "CHOFER") {
     const esSuyo = envio.estado === "EN_REPARTO" && !!usuario.choferId && envio.repartidorId === usuario.choferId;

@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cambiarEstadoEnvio } from "@/actions/envios";
 import { BotonImprimir } from "@/components/boton-imprimir";
+import { ComprobanteEnvio } from "@/components/comprobante-envio";
 import { FormEntrega } from "@/components/form-entrega";
 import { BotonEnviar, Entrada, Form, Selector } from "@/components/form";
 import { BotonLink, Dato, Encabezado, Estado, Tarjeta } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requerirUsuario, ROLES_GESTION } from "@/lib/dal";
 import { ACCION_ENVIO, transicionesEnvio } from "@/lib/envios";
-import { fechaHora, moneda, numeroViaje } from "@/lib/format";
+import { fechaHora, numeroViaje } from "@/lib/format";
 import { ESTADO_ENVIO } from "@/lib/labels";
 
 export const metadata: Metadata = { title: "Envío" };
@@ -34,8 +34,6 @@ export default async function PaginaEnvio({ params }: PageProps<"/envios/[id]">)
   });
   if (!envio) notFound();
 
-  const h = await headers();
-  const urlSeguimiento = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}/seguimiento/${envio.codigo}`;
   const transiciones = transicionesEnvio(envio);
   const choferes = transiciones.includes("EN_REPARTO")
     ? await db.chofer.findMany({ where: { activo: true }, orderBy: { apellido: "asc" } })
@@ -66,40 +64,7 @@ export default async function PaginaEnvio({ params }: PageProps<"/envios/[id]">)
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          {/* Comprobante para el cliente: es lo que sale al imprimir */}
-          <Tarjeta titulo="Comprobante para el remitente" className="print:border-0 print:shadow-none">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Código de seguimiento</p>
-                <p className="mt-1 font-mono text-3xl font-semibold tracking-wider text-stone-900">{envio.codigo}</p>
-                <p className="mt-3 text-sm text-stone-600">
-                  Seguí tu envío en <span className="break-all font-medium text-stone-900">{urlSeguimiento}</span>
-                </p>
-              </div>
-              <div className="text-right text-sm text-stone-600">
-                <p>Recibido el {fechaHora(envio.createdAt)}</p>
-                <p>en depósito {envio.depositoOrigen.nombre}</p>
-              </div>
-            </div>
-            <dl className="mt-6 grid grid-cols-1 gap-5 border-t border-stone-100 pt-5 sm:grid-cols-3">
-              <Dato etiqueta="Remitente">{envio.cliente.razonSocial}</Dato>
-              <Dato etiqueta="Destinatario">
-                {envio.destinatarioNombre}
-                {envio.destinatarioTelefono && <div className="text-xs text-stone-500">{envio.destinatarioTelefono}</div>}
-              </Dato>
-              <Dato etiqueta="Entrega">
-                {envio.entregaDomicilio ? envio.direccionEntrega : `Retira en depósito ${envio.depositoDestino.nombre}`}
-              </Dato>
-              <Dato etiqueta="Contenido">{envio.descripcion}</Dato>
-              <Dato etiqueta="Bultos / peso">
-                {envio.bultos} {envio.pesoKg != null && `· ${envio.pesoKg} kg`}
-              </Dato>
-              <Dato etiqueta="Precio">
-                {moneda(envio.precio)}
-                {envio.valorDeclarado && <div className="text-xs text-stone-500">Valor declarado {moneda(envio.valorDeclarado)}</div>}
-              </Dato>
-            </dl>
-          </Tarjeta>
+          <ComprobanteEnvio envio={envio} />
 
           <Tarjeta titulo="Historial" className="no-imprimir">
             <ol className="space-y-4">

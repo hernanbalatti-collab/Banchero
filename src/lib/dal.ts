@@ -15,6 +15,7 @@ export type UsuarioActual = {
   email: string;
   rol: Rol;
   choferId: string | null;
+  clienteId: string | null;
 };
 
 export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> => {
@@ -24,21 +25,38 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
 
   const usuario = await db.usuario.findUnique({
     where: { id: sesion.userId },
-    select: { id: true, nombre: true, email: true, rol: true, choferId: true, activo: true },
+    select: { id: true, nombre: true, email: true, rol: true, choferId: true, clienteId: true, activo: true },
   });
   if (!usuario || !usuario.activo) return null;
+  // Un usuario cliente sin empresa vinculada (p. ej. se borró el cliente) no ve nada
+  if (usuario.rol === "CLIENTE" && !usuario.clienteId) return null;
 
-  const { id, nombre, email, rol, choferId } = usuario;
-  return { id, nombre, email, rol, choferId };
+  const { id, nombre, email, rol, choferId, clienteId } = usuario;
+  return { id, nombre, email, rol, choferId, clienteId };
 });
 
 /** Exige sesión válida y, opcionalmente, uno de los roles indicados. */
 export async function requerirUsuario(roles?: Rol[]) {
   const usuario = await getUsuarioActual();
   if (!usuario) redirect("/login");
-  if (roles && !roles.includes(usuario.rol)) redirect("/");
+  if (roles && !roles.includes(usuario.rol)) redirect(inicioSegunRol(usuario.rol));
   return usuario;
 }
 
-/** Roles con acceso a la gestión (todo excepto el portal del chofer). */
+/** Exige un usuario del portal de clientes y devuelve el cliente al que pertenece. */
+export async function requerirCliente() {
+  const usuario = await requerirUsuario(["CLIENTE"]);
+  return { ...usuario, clienteId: usuario.clienteId! };
+}
+
+/** Roles con acceso a la gestión (todo excepto los portales del chofer y del cliente). */
 export const ROLES_GESTION: Rol[] = ["ADMIN", "OPERADOR"];
+
+export function esGestion(rol: Rol) {
+  return ROLES_GESTION.includes(rol);
+}
+
+/** Pantalla de inicio de cada rol. */
+export function inicioSegunRol(rol: Rol) {
+  return rol === "CHOFER" ? "/mis-viajes" : rol === "CLIENTE" ? "/portal" : "/";
+}

@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { TablaViajes } from "@/components/tabla-viajes";
 import { BotonLink, Encabezado, Kpi, Tarjeta, Vacio } from "@/components/ui";
 import { DIAS_AVISO_VENCIMIENTO, Vencimiento } from "@/components/vencimiento";
 import { db } from "@/lib/db";
-import { requerirUsuario } from "@/lib/dal";
+import { requerirUsuario, ROLES_GESTION } from "@/lib/dal";
 import { aNumero, hoy, moneda, sumarDias } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Panel" };
@@ -13,8 +12,7 @@ export const metadata: Metadata = { title: "Panel" };
 type Alerta = { id: string; href: string; quien: string; que: string; vence: Date };
 
 export default async function PaginaPanel() {
-  const usuario = await requerirUsuario();
-  if (usuario.rol === "CHOFER") redirect("/mis-viajes");
+  const usuario = await requerirUsuario(ROLES_GESTION);
 
   const h = hoy();
   const inicioMes = new Date(Date.UTC(h.getUTCFullYear(), h.getUTCMonth(), 1));

@@ -5,12 +5,19 @@ import type { Usuario } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { opciones, ROL } from "@/lib/labels";
 
-export async function FormUsuario({ usuario }: { usuario?: Usuario }) {
+export async function FormUsuario({ usuario, clienteInicial }: { usuario?: Usuario; clienteInicial?: string }) {
   // Legajos sin usuario, más el vinculado actualmente
-  const choferes = await db.chofer.findMany({
-    where: { OR: [{ usuario: null }, { id: usuario?.choferId ?? undefined }] },
-    orderBy: { apellido: "asc" },
-  });
+  const [choferes, clientes] = await Promise.all([
+    db.chofer.findMany({
+      where: { OR: [{ usuario: null }, { id: usuario?.choferId ?? undefined }] },
+      orderBy: { apellido: "asc" },
+    }),
+    // Un cliente puede tener varios usuarios
+    db.cliente.findMany({
+      where: { OR: [{ activo: true }, { id: usuario?.clienteId ?? undefined }] },
+      orderBy: { razonSocial: "asc" },
+    }),
+  ]);
 
   return (
     <Tarjeta className="max-w-3xl">
@@ -18,7 +25,7 @@ export async function FormUsuario({ usuario }: { usuario?: Usuario }) {
         <Grilla>
           <Entrada name="nombre" etiqueta="Nombre" valor={usuario?.nombre} requerido />
           <Entrada name="email" etiqueta="Email" type="email" valor={usuario?.email} requerido />
-          <Selector name="rol" etiqueta="Rol" valor={usuario?.rol ?? "OPERADOR"} opciones={opciones(ROL)} />
+          <Selector name="rol" etiqueta="Rol" valor={usuario?.rol ?? (clienteInicial ? "CLIENTE" : "OPERADOR")} opciones={opciones(ROL)} />
           <Selector
             name="choferId"
             etiqueta="Legajo de chofer"
@@ -26,6 +33,14 @@ export async function FormUsuario({ usuario }: { usuario?: Usuario }) {
             vacio="—"
             opciones={choferes.map((c) => ({ valor: c.id, etiqueta: `${c.apellido}, ${c.nombre} (DNI ${c.dni})` }))}
             ayuda="Solo para el rol Chofer: define qué viajes ve."
+          />
+          <Selector
+            name="clienteId"
+            etiqueta="Cliente"
+            valor={usuario?.clienteId ?? clienteInicial}
+            vacio="—"
+            opciones={clientes.map((c) => ({ valor: c.id, etiqueta: `${c.razonSocial} (CUIT ${c.cuit})` }))}
+            ayuda="Solo para el rol Cliente: ve únicamente los envíos, fletes y facturas de este cliente."
           />
           <Entrada
             name="password"

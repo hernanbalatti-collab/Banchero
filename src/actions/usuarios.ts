@@ -21,6 +21,7 @@ const esquema = z
     email,
     rol: z.enum(Rol),
     choferId: textoOpcional,
+    clienteId: textoOpcional,
     activo: checkbox,
     // Opcional al editar: vacío = no cambiar
     password: z.preprocess((v) => (v === "" ? undefined : v), password.optional()),
@@ -29,6 +30,11 @@ const esquema = z
     path: ["choferId"],
     message: "Un usuario chofer debe estar vinculado a un legajo",
     ...siValidos("rol", "choferId"),
+  })
+  .refine((v) => v.rol !== "CLIENTE" || v.clienteId, {
+    path: ["clienteId"],
+    message: "Un usuario cliente debe estar vinculado a un cliente",
+    ...siValidos("rol", "clienteId"),
   });
 
 export async function guardarUsuario(id: string | null, _: EstadoForm, formData: FormData): Promise<EstadoForm> {
@@ -41,6 +47,7 @@ export async function guardarUsuario(id: string | null, _: EstadoForm, formData:
   if (!r.success) return errorValidacion(r.error, valoresSeguros);
   const { password: nueva, ...datos } = r.data;
   if (datos.rol !== "CHOFER") datos.choferId = null;
+  if (datos.rol !== "CLIENTE") datos.clienteId = null;
 
   if (id === actual.id && (datos.rol !== "ADMIN" || !datos.activo)) {
     return { mensaje: "No podés quitarte el rol de administrador ni desactivarte a vos mismo.", valores: valoresSeguros };

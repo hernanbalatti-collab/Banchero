@@ -6,7 +6,7 @@ import { agregarGasto, eliminarGasto, registrarNovedad } from "@/actions/viajes"
 import { AreaTexto, BotonEnviar, Entrada, Form, Grilla, Selector } from "@/components/form";
 import { BotonLink, Dato, Encabezado, Estado, Tabla, Tarjeta, Td, Th, Vacio } from "@/components/ui";
 import { db } from "@/lib/db";
-import { requerirUsuario } from "@/lib/dal";
+import { esGestion, requerirUsuario } from "@/lib/dal";
 import { aInputFecha, aNumero, fecha, fechaHora, hoy, moneda, numero, numeroFactura, numeroViaje } from "@/lib/format";
 import { ESTADO_ENVIO, ESTADO_VIAJE, opciones, TIPO_GASTO } from "@/lib/labels";
 import { ACCION_ESTADO, puedeVerViaje, transicionesPermitidas } from "@/lib/viajes";
@@ -33,7 +33,7 @@ export default async function PaginaViaje({ params }: PageProps<"/viajes/[id]">)
   });
   if (!viaje || !puedeVerViaje(usuario, viaje)) notFound();
 
-  const gestion = usuario.rol !== "CHOFER";
+  const gestion = esGestion(usuario.rol);
   const transiciones = transicionesPermitidas(viaje.estado, usuario.rol);
   const editable = gestion && !viaje.facturaId && ["PENDIENTE", "ASIGNADO", "EN_TRANSITO"].includes(viaje.estado);
   const entreDepositos = !!(viaje.depositoOrigenId && viaje.depositoDestinoId);

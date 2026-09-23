@@ -15,6 +15,7 @@ export const ROL: Record<Rol, string> = {
   ADMIN: "Administrador",
   OPERADOR: "Operador",
   CHOFER: "Chofer",
+  CLIENTE: "Cliente",
 };
 
 export const CONDICION_IVA: Record<CondicionIva, string> = {

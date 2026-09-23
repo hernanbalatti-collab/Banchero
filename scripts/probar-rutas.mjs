@@ -19,6 +19,9 @@ for (const u of (await db.execute("select id, rol from Usuario")).rows) {
 }
 
 const choferUsuario = (await fila("select choferId from Usuario where rol = 'CHOFER'")).choferId;
+const clienteUsuario = (await fila("select clienteId from Usuario where rol = 'CLIENTE'")).clienteId;
+const delCliente = async (tabla, propio, extra = "") =>
+  (await fila(`select id from ${tabla} where clienteId ${propio ? "=" : "<>"} ? ${extra}`, clienteUsuario))?.id;
 const ids = {
   viaje: await uno("select id from Viaje where estado = 'EN_TRANSITO' and clienteId is not null"),
   viajeLinea: await uno("select id from Viaje where depositoOrigenId is not null and estado = 'ASIGNADO'"),
@@ -30,6 +33,12 @@ const ids = {
   chofer: await uno("select id from Chofer"),
   usuario: await uno("select id from Usuario"),
   envio: await uno("select id from Envio where estado = 'EN_DESTINO'"),
+  envioPropio: await delCliente("Envio", true),
+  envioAjeno: await delCliente("Envio", false),
+  fletePropio: await delCliente("Viaje", true),
+  fleteAjeno: await delCliente("Viaje", false),
+  facturaPropia: await delCliente("Factura", true, "and estado <> 'ANULADA'"),
+  facturaAjena: await delCliente("Factura", false),
 };
 const codigo = (await fila("select codigo from Envio where estado = 'EN_TRANSITO'")).codigo;
 
@@ -40,6 +49,10 @@ const privadas = [
   "/clientes", `/clientes/${ids.cliente}`, "/flota/vehiculos", `/flota/vehiculos/${ids.vehiculo}`,
   "/flota/choferes", `/flota/choferes/${ids.chofer}`, "/facturacion", "/facturacion/nueva", `/facturacion/${ids.factura}`,
   "/reportes", "/usuarios", `/usuarios/${ids.usuario}`, "/mis-viajes", `/viajes/${ids.viajePropio}`, `/viajes/${ids.viajeAjeno}`,
+  "/portal", "/portal/envios", "/portal/envios?estado=TODOS", "/portal/fletes", "/portal/facturas",
+  `/portal/envios/${ids.envioPropio}`, `/portal/fletes/${ids.fletePropio}`, `/portal/facturas/${ids.facturaPropia}`,
+  // Del portal, de otro cliente: tienen que dar 404
+  `/portal/envios/${ids.envioAjeno}`, `/portal/fletes/${ids.fleteAjeno}`, `/portal/facturas/${ids.facturaAjena}`,
 ];
 const publicas = [
   "/seguimiento", `/seguimiento/${codigo}`, `/seguimiento/${codigo.toLowerCase().replace("-", "")}`,
@@ -55,7 +68,7 @@ async function pedir(ruta, token) {
 }
 
 const corto = (ruta) => ruta.replace(/[a-z0-9]{25}/g, ":id");
-for (const rol of ["ADMIN", "OPERADOR", "CHOFER"]) {
+for (const rol of ["ADMIN", "OPERADOR", "CHOFER", "CLIENTE"]) {
   console.log(`\n== ${rol}`);
   for (const ruta of privadas) console.log(`${(await pedir(ruta, tokens[rol])).padEnd(22)} ${corto(ruta)}`);
 }

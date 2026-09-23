@@ -19,7 +19,8 @@ const TRANSICIONES_CHOFER: Partial<Record<EstadoViaje, EstadoViaje[]>> = {
 };
 
 export function transicionesPermitidas(actual: EstadoViaje, rol: Rol): EstadoViaje[] {
-  return rol === "CHOFER" ? (TRANSICIONES_CHOFER[actual] ?? []) : TRANSICIONES[actual];
+  if (rol === "ADMIN" || rol === "OPERADOR") return TRANSICIONES[actual];
+  return rol === "CHOFER" ? (TRANSICIONES_CHOFER[actual] ?? []) : [];
 }
 
 export const ACCION_ESTADO: Partial<Record<EstadoViaje, string>> = {
@@ -39,6 +40,8 @@ export function puedeVerViaje(
   usuario: { rol: Rol; choferId: string | null },
   viaje: { choferId: string | null },
 ) {
-  if (usuario.rol !== "CHOFER") return true;
-  return usuario.choferId != null && viaje.choferId === usuario.choferId;
+  if (usuario.rol === "ADMIN" || usuario.rol === "OPERADOR") return true;
+  if (usuario.rol === "CHOFER") return usuario.choferId != null && viaje.choferId === usuario.choferId;
+  // El cliente ve sus fletes desde el portal, no desde la gestión
+  return false;
 }

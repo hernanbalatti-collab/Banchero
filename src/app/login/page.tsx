@@ -4,13 +4,13 @@ import { redirect } from "next/navigation";
 import { iniciarSesion } from "@/actions/auth";
 import { BotonEnviar, Entrada, Form } from "@/components/form";
 import { BotonLink } from "@/components/ui";
-import { getUsuarioActual } from "@/lib/dal";
+import { getUsuarioActual, inicioSegunRol } from "@/lib/dal";
 
 export const metadata: Metadata = { title: "Ingresar" };
 
 export default async function PaginaLogin() {
   const usuario = await getUsuarioActual();
-  if (usuario) redirect(usuario.rol === "CHOFER" ? "/mis-viajes" : "/");
+  if (usuario) redirect(inicioSegunRol(usuario.rol));
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-tierra px-4 py-10">

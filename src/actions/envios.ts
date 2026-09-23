@@ -6,7 +6,7 @@ import { notFound, redirect } from "next/navigation";
 import type { Prisma } from "@/generated/prisma/client";
 import { EstadoEnvio } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { requerirUsuario, ROLES_GESTION } from "@/lib/dal";
+import { esGestion, requerirUsuario, ROLES_GESTION } from "@/lib/dal";
 import { generarCodigo, transicionesEnvio } from "@/lib/envios";
 import { desdeInputFechaHora } from "@/lib/format";
 import { ESTADO_ENVIO } from "@/lib/labels";
@@ -101,8 +101,8 @@ export async function cambiarEstadoEnvio(id: string, _: EstadoForm, formData: Fo
   const envio = await db.envio.findUnique({ where: { id } });
   if (!envio) notFound();
   const permitidas = transicionesEnvio(envio, usuario);
-  // Un chofer sin repartos asignados no debe saber que el envío existe
-  if (usuario.rol === "CHOFER" && permitidas.length === 0) notFound();
+  // Fuera de la gestión (chofer sin ese reparto, cliente) no debe saberse que el envío existe
+  if (!esGestion(usuario.rol) && permitidas.length === 0) notFound();
 
   const valores = datosForm(formData);
   const r = esquemaEstado.safeParse(valores);

@@ -2,7 +2,8 @@
 
 Aplicación web de Expreso Banchero: fletes, encomiendas entre
 depósitos (Chivilcoy ⇄ CABA), flota, choferes, clientes, facturación y reportes.
-Los clientes siguen sus envíos en una página pública, sin cuenta.
+Los clientes siguen sus envíos en una página pública, sin cuenta, o ingresan a su portal
+con usuario propio.
 
 **Stack:** Next.js 16 (App Router, server actions) · Prisma 7 + SQLite/libSQL (Turso en
 producción) · Tailwind 4 · zod.
@@ -24,6 +25,7 @@ Usuarios del seed:
 | Administrador | `admin@cargas.local`    | `admin1234`    |
 | Operador      | `operador@cargas.local` | `operador1234` |
 | Chofer        | `chofer@cargas.local`   | `chofer1234`   |
+| Cliente       | `cliente@cargas.local`  | `cliente1234`  |
 
 ## Módulos
 
@@ -53,8 +55,13 @@ Usuarios del seed:
   cobro y anulación (que libera los viajes). Es un comprobante interno: la factura
   electrónica ante ARCA no está integrada.
 - **Reportes**: ingresos, gastos y margen por mes, cliente, vehículo y chofer.
-- **Usuarios** (solo administrador): roles Administrador, Operador y Chofer. El chofer solo
-  ve sus viajes y puede iniciarlos, entregarlos, registrar novedades y cargar gastos.
+- **Portal de clientes** (`/portal`): cada cliente ingresa con su usuario y ve solo sus
+  envíos (estado, recorrido, comprobante y quién recibió), sus fletes (estado, ubicaciones y
+  tarifa) y sus facturas. No ve gastos, márgenes, notas internas, choferes ni datos de otros
+  clientes. Los usuarios se crean desde la ficha del cliente o desde Usuarios.
+- **Usuarios** (solo administrador): roles Administrador, Operador, Chofer y Cliente. El chofer
+  solo ve sus viajes y puede iniciarlos, entregarlos, registrar novedades y cargar gastos. El
+  usuario Cliente se vincula a un cliente (puede haber varios por cliente).
 
 ## Publicar en Vercel + Turso
 
@@ -89,7 +96,7 @@ La app usa el adaptador libSQL de Prisma: en desarrollo apunta al archivo
 ```
 prisma/            schema, migraciones y seed
 src/actions/       server actions (validan con zod y verifican permisos)
-src/app/(app)/     pantallas con sesión
+src/app/(app)/     pantallas con sesión (portal/ = portal de clientes)
 src/app/seguimiento/  seguimiento público
 src/app/login/
 src/lib/           acceso a datos (dal.ts), sesión, reglas de viajes y envíos, formatos

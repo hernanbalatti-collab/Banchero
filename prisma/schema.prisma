@@ -13,6 +13,7 @@ enum Rol {
   ADMIN
   OPERADOR
   CHOFER
+  CLIENTE
 }
 
 model Usuario {
@@ -25,11 +26,16 @@ model Usuario {
   // Solo para usuarios con rol CHOFER: el legajo de chofer vinculado
   choferId     String?  @unique
   chofer       Chofer?  @relation(fields: [choferId], references: [id])
+  // Solo para usuarios con rol CLIENTE: la empresa cuyos datos ve en el portal
+  clienteId    String?
+  cliente      Cliente? @relation(fields: [clienteId], references: [id])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   eventos      EventoViaje[]
   eventosEnvio EventoEnvio[]
+
+  @@index([clienteId])
 }
 
 // ─── Clientes ───────────────────────────────────────────────
@@ -56,6 +62,7 @@ model Cliente {
   viajes   Viaje[]
   facturas Factura[]
   envios   Envio[]
+  usuarios Usuario[]
 }
 
 // ─── Flota ──────────────────────────────────────────────────

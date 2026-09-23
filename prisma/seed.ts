@@ -152,6 +152,7 @@ async function main() {
       { nombre: "Admin General", email: "admin@cargas.local", passwordHash: await hash("admin1234"), rol: "ADMIN" },
       { nombre: "Laura Operaciones", email: "operador@cargas.local", passwordHash: await hash("operador1234"), rol: "OPERADOR" },
       { nombre: "Carlos Gómez", email: "chofer@cargas.local", passwordHash: await hash("chofer1234"), rol: "CHOFER", choferId: choferes[0].id },
+      { nombre: "Portal Cliente", email: "cliente@cargas.local", passwordHash: await hash("cliente1234"), rol: "CLIENTE", clienteId: clientes[0].id },
     ],
   });
   const admin = await db.usuario.findUniqueOrThrow({ where: { email: "admin@cargas.local" } });

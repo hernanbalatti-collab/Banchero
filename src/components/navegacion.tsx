@@ -23,10 +23,17 @@ const ITEMS: Item[] = [
   { href: "/facturacion", etiqueta: "Facturación", roles: ["ADMIN", "OPERADOR"] },
   { href: "/reportes", etiqueta: "Reportes", roles: ["ADMIN", "OPERADOR"] },
   { href: "/usuarios", etiqueta: "Usuarios", roles: ["ADMIN"] },
+  { href: "/portal", etiqueta: "Inicio", roles: ["CLIENTE"] },
+  { href: "/portal/envios", etiqueta: "Mis envíos", roles: ["CLIENTE"] },
+  { href: "/portal/fletes", etiqueta: "Mis fletes", roles: ["CLIENTE"] },
+  { href: "/portal/facturas", etiqueta: "Mis facturas", roles: ["CLIENTE"] },
 ];
 
+// Inicios de sección: solo se marcan en su propia página, no en las de adentro
+const EXACTAS = ["/", "/portal"];
+
 function activo(ruta: string, href: string) {
-  return href === "/" ? ruta === "/" : ruta === href || ruta.startsWith(`${href}/`);
+  return EXACTAS.includes(href) ? ruta === href : ruta === href || ruta.startsWith(`${href}/`);
 }
 
 export function Navegacion({ nombre, rol }: { nombre: string; rol: Rol }) {

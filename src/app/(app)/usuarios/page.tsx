@@ -20,6 +20,7 @@ export default async function PaginaUsuarios() {
       activo: true,
       createdAt: true,
       chofer: { select: { nombre: true, apellido: true } },
+      cliente: { select: { razonSocial: true } },
     },
   });
 
@@ -49,12 +50,13 @@ export default async function PaginaUsuarios() {
                 </Td>
                 <Td>{u.email}</Td>
                 <Td>
-                  <Insignia tono={u.rol === "ADMIN" ? "violeta" : u.rol === "OPERADOR" ? "azul" : "gris"}>{ROL[u.rol]}</Insignia>
+                  <Insignia tono={u.rol === "ADMIN" ? "violeta" : u.rol === "OPERADOR" ? "azul" : u.rol === "CLIENTE" ? "verde" : "gris"}>{ROL[u.rol]}</Insignia>
                   {u.chofer && (
                     <span className="ml-2 text-xs text-stone-500">
                       {u.chofer.apellido}, {u.chofer.nombre}
                     </span>
                   )}
+                  {u.cliente && <span className="ml-2 text-xs text-stone-500">{u.cliente.razonSocial}</span>}
                 </Td>
                 <Td className="tabular-nums">{fechaHora(u.createdAt)}</Td>
                 <Td derecha>
