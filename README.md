@@ -57,11 +57,19 @@ Usuarios del seed:
 - **Reportes**: ingresos, gastos y margen por mes, cliente, vehículo y chofer.
 - **Portal de clientes** (`/portal`): cada cliente ingresa con su usuario y ve solo sus
   envíos (estado, recorrido, comprobante y quién recibió), sus fletes (estado, ubicaciones y
-  tarifa) y sus facturas. No ve gastos, márgenes, notas internas, choferes ni datos de otros
+  tarifa) y sus facturas. Además carga **pedidos**: un flete (origen, destino, fecha y carga)
+  o una encomienda (destinatario, depósitos, bultos) antes de traerla, y los puede cancelar
+  mientras no se revisaron. No ve gastos, márgenes, notas internas, choferes ni datos de otros
   clientes. Los usuarios se crean desde la ficha del cliente o desde Usuarios.
+- **Pedidos** (`/pedidos`): la bandeja de lo que cargan los clientes. El operador acepta un
+  flete con «Crear viaje» y una encomienda con «Recibir en depósito»: se abre el alta con los
+  datos del pedido, se completa precio y asignación, y el pedido queda vinculado al viaje o
+  envío. También puede rechazarlo con un motivo que ve el cliente. El Panel avisa cuando hay
+  pedidos por revisar.
 - **Usuarios** (solo administrador): roles Administrador, Operador, Chofer y Cliente. El chofer
   solo ve sus viajes y puede iniciarlos, entregarlos, registrar novedades y cargar gastos. El
-  usuario Cliente se vincula a un cliente (puede haber varios por cliente).
+  usuario Cliente se vincula a un cliente (puede haber varios por cliente): no carga viajes ni
+  envíos, solo pedidos, que la empresa revisa.
 
 ## Publicar en Vercel + Turso
 

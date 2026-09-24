@@ -19,7 +19,7 @@ export default async function PaginaPanel() {
   const limite = sumarDias(h, DIAS_AVISO_VENCIMIENTO);
   const porVencer = { lte: limite };
 
-  const [enTransito, pendientes, entregadosMes, encomiendasMes, porCobrar, activos, vehiculos, choferes, depositos, enviosPorEstado] = await Promise.all([
+  const [enTransito, pendientes, entregadosMes, encomiendasMes, porCobrar, activos, vehiculos, choferes, depositos, enviosPorEstado, pedidos] = await Promise.all([
     db.viaje.count({ where: { estado: "EN_TRANSITO" } }),
     db.viaje.count({ where: { estado: "PENDIENTE" } }),
     db.viaje.aggregate({ where: { estado: "ENTREGADO", fechaEntrega: { gte: inicioMes } }, _sum: { tarifa: true }, _count: true }),
@@ -51,7 +51,10 @@ export default async function PaginaPanel() {
       where: { estado: { in: ["RECIBIDO", "EN_TRANSITO", "EN_DESTINO", "EN_REPARTO"] } },
       _count: true,
     }),
+    db.pedido.groupBy({ by: ["tipo"], where: { estado: "PENDIENTE" }, _count: true }),
   ]);
+  const pedidosFlete = pedidos.find((p) => p.tipo === "FLETE")?._count ?? 0;
+  const pedidosEncomienda = pedidos.find((p) => p.tipo === "ENCOMIENDA")?._count ?? 0;
 
   const contar = (filtro: (g: (typeof enviosPorEstado)[number]) => boolean) =>
     enviosPorEstado.filter(filtro).reduce((s, g) => s + g._count, 0);
@@ -77,6 +80,19 @@ export default async function PaginaPanel() {
         subtitulo="Resumen de la operación"
         acciones={<BotonLink href="/viajes/nuevo">Nuevo viaje</BotonLink>}
       />
+
+      {pedidosFlete + pedidosEncomienda > 0 && (
+        <Link
+          href="/pedidos"
+          className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 transition-colors hover:border-amber-300"
+        >
+          <span>
+            <span className="font-semibold">Pedidos de clientes por revisar:</span> {pedidosFlete} flete{pedidosFlete === 1 ? "" : "s"} y{" "}
+            {pedidosEncomienda} encomienda{pedidosEncomienda === 1 ? "" : "s"}
+          </span>
+          <span className="font-medium">Revisar →</span>
+        </Link>
+      )}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi etiqueta="En tránsito" valor={enTransito} detalle="Viajes en ruta ahora" href="/viajes?estado=EN_TRANSITO" />

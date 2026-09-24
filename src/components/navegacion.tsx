@@ -13,6 +13,7 @@ type Item = { href: string; etiqueta: string; roles: Rol[] };
 
 const ITEMS: Item[] = [
   { href: "/", etiqueta: "Panel", roles: ["ADMIN", "OPERADOR"] },
+  { href: "/pedidos", etiqueta: "Pedidos", roles: ["ADMIN", "OPERADOR"] },
   { href: "/viajes", etiqueta: "Viajes", roles: ["ADMIN", "OPERADOR"] },
   { href: "/envios", etiqueta: "Envíos", roles: ["ADMIN", "OPERADOR"] },
   { href: "/depositos", etiqueta: "Depósitos", roles: ["ADMIN", "OPERADOR"] },
@@ -24,6 +25,7 @@ const ITEMS: Item[] = [
   { href: "/reportes", etiqueta: "Reportes", roles: ["ADMIN", "OPERADOR"] },
   { href: "/usuarios", etiqueta: "Usuarios", roles: ["ADMIN"] },
   { href: "/portal", etiqueta: "Inicio", roles: ["CLIENTE"] },
+  { href: "/portal/pedidos", etiqueta: "Mis pedidos", roles: ["CLIENTE"] },
   { href: "/portal/envios", etiqueta: "Mis envíos", roles: ["CLIENTE"] },
   { href: "/portal/fletes", etiqueta: "Mis fletes", roles: ["CLIENTE"] },
   { href: "/portal/facturas", etiqueta: "Mis facturas", roles: ["CLIENTE"] },

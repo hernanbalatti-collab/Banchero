@@ -75,3 +75,7 @@ export function numeroFactura(f: { tipo: string; puntoVenta: number; numero: num
 export function numeroViaje(n: number) {
   return `V-${String(n).padStart(5, "0")}`;
 }
+
+export function numeroPedido(n: number) {
+  return `P-${String(n).padStart(5, "0")}`;
+}

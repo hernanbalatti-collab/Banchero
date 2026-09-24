@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AccionesPedido, INCLUDE_PEDIDO, TablaPedidos } from "@/components/pedidos";
 import { Encabezado, Kpi, Tarjeta, Vacio } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requerirCliente } from "@/lib/dal";
@@ -21,7 +22,7 @@ function VerTodos({ href }: { href: string }) {
 export default async function PaginaPortal() {
   const { nombre, clienteId } = await requerirCliente();
 
-  const [cliente, envios, fletes, facturas, pendiente] = await Promise.all([
+  const [cliente, envios, fletes, facturas, pendiente, pedidos] = await Promise.all([
     db.cliente.findUniqueOrThrow({ where: { id: clienteId }, select: { razonSocial: true } }),
     db.envio.findMany({
       where: { clienteId, estado: { in: ENVIOS_ACTIVOS } },
@@ -31,11 +32,12 @@ export default async function PaginaPortal() {
     db.viaje.findMany({ where: { clienteId, estado: { in: ESTADOS_ACTIVOS } }, orderBy: { fechaCarga: "asc" } }),
     db.factura.findMany({ where: { clienteId, estado: "EMITIDA" }, orderBy: { fecha: "asc" } }),
     db.factura.aggregate({ where: { clienteId, estado: "EMITIDA" }, _sum: { total: true } }),
+    db.pedido.findMany({ where: { clienteId, estado: "PENDIENTE" }, orderBy: { createdAt: "desc" }, include: INCLUDE_PEDIDO }),
   ]);
 
   return (
     <>
-      <Encabezado titulo={`Hola, ${nombre.split(" ")[0]}`} subtitulo={cliente.razonSocial} />
+      <Encabezado titulo={`Hola, ${nombre.split(" ")[0]}`} subtitulo={cliente.razonSocial} acciones={<AccionesPedido />} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Kpi etiqueta="Envíos en curso" valor={envios.length} detalle="Todavía no entregados" href="/portal/envios" />
@@ -49,6 +51,11 @@ export default async function PaginaPortal() {
       </div>
 
       <div className="space-y-6">
+        {pedidos.length > 0 && (
+          <Tarjeta titulo="Pedidos por confirmar" acciones={<VerTodos href="/portal/pedidos" />} sinPadding>
+            <TablaPedidos pedidos={pedidos} base="/portal/pedidos" />
+          </Tarjeta>
+        )}
         <Tarjeta titulo="Envíos en curso" acciones={<VerTodos href="/portal/envios?estado=TODOS" />} sinPadding>
           {envios.length === 0 ? <Vacio>No tenés envíos en curso.</Vacio> : <TablaEnviosCliente envios={envios} />}
         </Tarjeta>

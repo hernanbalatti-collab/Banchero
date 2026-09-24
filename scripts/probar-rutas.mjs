@@ -39,6 +39,11 @@ const ids = {
   fleteAjeno: await delCliente("Viaje", false),
   facturaPropia: await delCliente("Factura", true, "and estado <> 'ANULADA'"),
   facturaAjena: await delCliente("Factura", false),
+  pedido: await uno("select id from Pedido"),
+  pedidoFlete: await uno("select id from Pedido where tipo = 'FLETE' and estado = 'PENDIENTE'"),
+  pedidoEncomienda: await uno("select id from Pedido where tipo = 'ENCOMIENDA' and estado = 'PENDIENTE'"),
+  pedidoPropio: await delCliente("Pedido", true),
+  pedidoAjeno: await delCliente("Pedido", false),
 };
 const codigo = (await fila("select codigo from Envio where estado = 'EN_TRANSITO'")).codigo;
 
@@ -48,11 +53,14 @@ const privadas = [
   "/depositos", "/depositos?deposito=dep_caba", "/envios/entregas", "/envios/entregas/exportar",
   "/clientes", `/clientes/${ids.cliente}`, "/flota/vehiculos", `/flota/vehiculos/${ids.vehiculo}`,
   "/flota/choferes", `/flota/choferes/${ids.chofer}`, "/facturacion", "/facturacion/nueva", `/facturacion/${ids.factura}`,
+  "/pedidos", "/pedidos?estado=TODOS", `/pedidos/${ids.pedido}`,
+  `/viajes/nuevo?pedido=${ids.pedidoFlete}`, `/envios/nuevo?pedido=${ids.pedidoEncomienda}`,
   "/reportes", "/usuarios", `/usuarios/${ids.usuario}`, "/mis-viajes", `/viajes/${ids.viajePropio}`, `/viajes/${ids.viajeAjeno}`,
   "/portal", "/portal/envios", "/portal/envios?estado=TODOS", "/portal/fletes", "/portal/facturas",
+  "/portal/pedidos", "/portal/pedidos/nuevo?tipo=FLETE", "/portal/pedidos/nuevo?tipo=ENCOMIENDA", `/portal/pedidos/${ids.pedidoPropio}`,
   `/portal/envios/${ids.envioPropio}`, `/portal/fletes/${ids.fletePropio}`, `/portal/facturas/${ids.facturaPropia}`,
   // Del portal, de otro cliente: tienen que dar 404
-  `/portal/envios/${ids.envioAjeno}`, `/portal/fletes/${ids.fleteAjeno}`, `/portal/facturas/${ids.facturaAjena}`,
+  `/portal/pedidos/${ids.pedidoAjeno}`, `/portal/envios/${ids.envioAjeno}`, `/portal/fletes/${ids.fleteAjeno}`, `/portal/facturas/${ids.facturaAjena}`,
 ];
 const publicas = [
   "/seguimiento", `/seguimiento/${codigo}`, `/seguimiento/${codigo.toLowerCase().replace("-", "")}`,

@@ -2,10 +2,12 @@ import type {
   CondicionIva,
   EstadoEnvio,
   EstadoFactura,
+  EstadoPedido,
   EstadoVehiculo,
   EstadoViaje,
   Rol,
   TipoGasto,
+  TipoPedido,
   TipoVehiculo,
 } from "@/generated/prisma/enums";
 
@@ -69,6 +71,18 @@ export const ESTADO_FACTURA: Record<EstadoFactura, [string, Tono]> = {
   EMITIDA: ["Pendiente de cobro", "ambar"],
   PAGADA: ["Cobrada", "verde"],
   ANULADA: ["Anulada", "gris"],
+};
+
+export const TIPO_PEDIDO: Record<TipoPedido, string> = {
+  FLETE: "Flete",
+  ENCOMIENDA: "Encomienda",
+};
+
+export const ESTADO_PEDIDO: Record<EstadoPedido, [string, Tono]> = {
+  PENDIENTE: ["Por revisar", "ambar"],
+  ACEPTADO: ["Aceptado", "verde"],
+  RECHAZADO: ["Rechazado", "rojo"],
+  CANCELADO: ["Cancelado", "gris"],
 };
 
 /** Convierte un mapa de etiquetas en opciones para un <select>. */

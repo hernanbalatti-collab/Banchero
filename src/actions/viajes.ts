@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { requerirUsuario, ROLES_GESTION } from "@/lib/dal";
 import { hoy } from "@/lib/format";
 import { ESTADO_VIAJE } from "@/lib/labels";
+import { aceptarPedido, PedidoYaRevisado, verificarPedido } from "@/lib/pedidos";
 import {
   datosForm,
   enteroOpcional,
@@ -76,19 +77,31 @@ export async function guardarViaje(id: string | null, _: EstadoForm, formData: F
   const datos = await completarRecorrido(r.data);
 
   if (!id) {
+    // Viene de un pedido de flete cargado por el cliente en el portal
+    const pedidoId = valores.pedidoId || undefined;
+    const problema = await verificarPedido(pedidoId, "FLETE", datos.clienteId);
+    if (problema) return { mensaje: problema, valores };
+
     const estado = estadoSegunAsignacion(datos.choferId, datos.vehiculoId);
     const viaje = await db.$transaction(async (tx) => {
       const ultimo = await tx.viaje.aggregate({ _max: { numero: true } });
-      return tx.viaje.create({
+      const creado = await tx.viaje.create({
         data: {
           ...datos,
           numero: (ultimo._max.numero ?? 0) + 1,
           estado,
-          eventos: { create: { estado, nota: "Viaje creado", usuarioId: usuario.id } },
+          eventos: { create: { estado, nota: pedidoId ? "Viaje creado a partir del pedido del cliente" : "Viaje creado", usuarioId: usuario.id } },
         },
       });
+      if (pedidoId) await aceptarPedido(tx, pedidoId, { viajeId: creado.id }, usuario.id);
+      return creado;
+    }).catch((e) => {
+      if (e instanceof PedidoYaRevisado) return e;
+      throw e;
     });
+    if (viaje instanceof PedidoYaRevisado) return { mensaje: viaje.message, valores };
     revalidatePath("/viajes");
+    if (pedidoId) revalidatePath("/pedidos", "layout");
     redirect(`/viajes/${viaje.id}`);
   }
 

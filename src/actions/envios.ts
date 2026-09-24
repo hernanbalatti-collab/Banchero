@@ -10,6 +10,7 @@ import { esGestion, requerirUsuario, ROLES_GESTION } from "@/lib/dal";
 import { generarCodigo, transicionesEnvio } from "@/lib/envios";
 import { desdeInputFechaHora } from "@/lib/format";
 import { ESTADO_ENVIO } from "@/lib/labels";
+import { aceptarPedido, PedidoYaRevisado, verificarPedido } from "@/lib/pedidos";
 import {
   checkbox,
   datosForm,
@@ -59,26 +60,36 @@ export async function crearEnvio(_: EstadoForm, formData: FormData): Promise<Est
   if (!r.success) return errorValidacion(r.error, valores);
   const { bultos, ...datos } = r.data;
 
+  // Viene de una encomienda pre-cargada por el cliente en el portal
+  const pedidoId = valores.pedidoId || undefined;
+  const problema = await verificarPedido(pedidoId, "ENCOMIENDA", datos.clienteId);
+  if (problema) return { mensaje: problema, valores };
+
   // Reintenta ante la (improbable) colisión del código aleatorio
   let envioId: string | null = null;
   for (let intento = 0; intento < 5 && !envioId; intento++) {
     try {
-      const envio = await db.envio.create({
-        data: {
-          ...datos,
-          bultos: bultos ?? 1,
-          codigo: generarCodigo(),
-          eventos: { create: { estado: "RECIBIDO", depositoId: datos.depositoOrigenId, usuarioId: usuario.id } },
-        },
+      envioId = await db.$transaction(async (tx) => {
+        const envio = await tx.envio.create({
+          data: {
+            ...datos,
+            bultos: bultos ?? 1,
+            codigo: generarCodigo(),
+            eventos: { create: { estado: "RECIBIDO", depositoId: datos.depositoOrigenId, usuarioId: usuario.id } },
+          },
+        });
+        if (pedidoId) await aceptarPedido(tx, pedidoId, { envioId: envio.id }, usuario.id);
+        return envio.id;
       });
-      envioId = envio.id;
     } catch (e) {
+      if (e instanceof PedidoYaRevisado) return { mensaje: e.message, valores };
       if (!esDuplicado(e)) throw e;
     }
   }
   if (!envioId) return { mensaje: "No se pudo generar el código de seguimiento. Probá de nuevo.", valores };
 
   revalidatePath("/envios");
+  if (pedidoId) revalidatePath("/pedidos", "layout");
   redirect(`/envios/${envioId}`);
 }
 

@@ -52,6 +52,7 @@ const CARGAS = [
 
 async function main() {
   // Limpieza en orden de dependencias (los depósitos los crea la migración)
+  await db.pedido.deleteMany();
   await db.eventoEnvio.deleteMany();
   await db.envio.deleteMany();
   await db.eventoViaje.deleteMany();
@@ -403,6 +404,38 @@ async function main() {
       },
     });
   }
+
+  // ─── Pedidos del portal, esperando revisión ───
+  const usuarioCliente = await db.usuario.findUniqueOrThrow({ where: { email: "cliente@cargas.local" } });
+  await db.pedido.createMany({
+    data: [
+      {
+        numero: 1,
+        tipo: "FLETE",
+        clienteId: clientes[0].id,
+        creadoPorId: usuarioCliente.id,
+        origen: "Chivilcoy, BA",
+        destino: "Rosario, SF",
+        fechaCarga: dias(5),
+        descripcion: "12 pallets de alimentos secos",
+        pesoKg: 9000,
+        observaciones: "Carga con autoelevador en planta, de 8 a 16 h.",
+      },
+      {
+        numero: 2,
+        tipo: "ENCOMIENDA",
+        clienteId: clientes[0].id,
+        creadoPorId: usuarioCliente.id,
+        depositoOrigenId: CHV,
+        depositoDestinoId: CABA,
+        destinatarioNombre: "Marta Suárez",
+        destinatarioTelefono: "11 5555-0101",
+        descripcion: "Caja con repuestos",
+        bultos: 2,
+        pesoKg: 14,
+      },
+    ],
+  });
 
   const [nv, nf, ne] = await Promise.all([db.viaje.count(), db.factura.count(), db.envio.count()]);
   console.log(

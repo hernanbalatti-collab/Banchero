@@ -34,6 +34,8 @@ model Usuario {
 
   eventos      EventoViaje[]
   eventosEnvio EventoEnvio[]
+  pedidos      Pedido[]     @relation("PedidoCreadoPor")
+  revisados    Pedido[]     @relation("PedidoRevisadoPor")
 
   @@index([clienteId])
 }
@@ -63,6 +65,7 @@ model Cliente {
   facturas Factura[]
   envios   Envio[]
   usuarios Usuario[]
+  pedidos  Pedido[]
 }
 
 // ─── Flota ──────────────────────────────────────────────────
@@ -166,6 +169,7 @@ model Viaje {
   eventos EventoViaje[]
   gastos  Gasto[]
   envios  Envio[]
+  pedido  Pedido?
 
   @@index([estado])
   @@index([clienteId])
@@ -217,6 +221,8 @@ model Deposito {
   direccion String?
   telefono  String?
 
+  pedidosDesde  Pedido[]      @relation("PedidoDesde")
+  pedidosHacia  Pedido[]      @relation("PedidoHacia")
   viajesDesde   Viaje[]       @relation("ViajeDesde")
   viajesHacia   Viaje[]       @relation("ViajeHacia")
   enviosDesde   Envio[]       @relation("EnvioDesde")
@@ -267,6 +273,7 @@ model Envio {
   updatedAt            DateTime    @updatedAt
 
   eventos EventoEnvio[]
+  pedido  Pedido?
 
   @@index([estado])
   @@index([clienteId])
@@ -289,6 +296,66 @@ model EventoEnvio {
   createdAt  DateTime    @default(now())
 
   @@index([envioId])
+}
+
+// ─── Pedidos de clientes ───────────────────────────────────
+// El cliente los carga desde el portal; la empresa los revisa, les pone
+// precio y los convierte en un viaje (flete) o en un envío (encomienda).
+
+enum TipoPedido {
+  FLETE
+  ENCOMIENDA
+}
+
+enum EstadoPedido {
+  PENDIENTE // esperando que la empresa lo revise
+  ACEPTADO  // ya tiene su viaje o envío
+  RECHAZADO
+  CANCELADO // lo canceló el cliente antes de que se revisara
+}
+
+model Pedido {
+  id                   String       @id @default(cuid())
+  numero               Int          @unique
+  tipo                 TipoPedido
+  estado               EstadoPedido @default(PENDIENTE)
+  clienteId            String
+  cliente              Cliente      @relation(fields: [clienteId], references: [id])
+  creadoPorId          String
+  creadoPor            Usuario      @relation("PedidoCreadoPor", fields: [creadoPorId], references: [id])
+  descripcion          String
+  pesoKg               Float?
+  // Flete
+  origen               String?
+  destino              String?
+  fechaCarga           DateTime?
+  // Encomienda
+  depositoOrigenId     String?
+  depositoOrigen       Deposito?    @relation("PedidoDesde", fields: [depositoOrigenId], references: [id])
+  depositoDestinoId    String?
+  depositoDestino      Deposito?    @relation("PedidoHacia", fields: [depositoDestinoId], references: [id])
+  destinatarioNombre   String?
+  destinatarioTelefono String?
+  entregaDomicilio     Boolean      @default(false)
+  direccionEntrega     String?
+  bultos               Int?
+  valorDeclarado       Decimal?
+  // Del cliente para la empresa
+  observaciones        String?
+  // De la empresa para el cliente (p. ej. motivo del rechazo)
+  respuesta            String?
+  revisadoPorId        String?
+  revisadoPor          Usuario?     @relation("PedidoRevisadoPor", fields: [revisadoPorId], references: [id])
+  fechaRevision        DateTime?
+  viajeId              String?      @unique
+  viaje                Viaje?       @relation(fields: [viajeId], references: [id])
+  envioId              String?      @unique
+  envio                Envio?       @relation(fields: [envioId], references: [id])
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@index([estado])
+  @@index([clienteId])
 }
 
 // ─── Facturación ────────────────────────────────────────────

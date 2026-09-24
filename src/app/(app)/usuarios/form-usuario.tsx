@@ -1,9 +1,9 @@
 import { guardarUsuario } from "@/actions/usuarios";
-import { BotonEnviar, Casilla, Entrada, Form, Grilla, Selector } from "@/components/form";
+import { BotonEnviar, Casilla, Entrada, Form, Grilla } from "@/components/form";
 import { BotonLink, Tarjeta } from "@/components/ui";
 import type { Usuario } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { opciones, ROL } from "@/lib/labels";
+import { CamposRol } from "./campos-rol";
 
 export async function FormUsuario({ usuario, clienteInicial }: { usuario?: Usuario; clienteInicial?: string }) {
   // Legajos sin usuario, más el vinculado actualmente
@@ -25,22 +25,12 @@ export async function FormUsuario({ usuario, clienteInicial }: { usuario?: Usuar
         <Grilla>
           <Entrada name="nombre" etiqueta="Nombre" valor={usuario?.nombre} requerido />
           <Entrada name="email" etiqueta="Email" type="email" valor={usuario?.email} requerido />
-          <Selector name="rol" etiqueta="Rol" valor={usuario?.rol ?? (clienteInicial ? "CLIENTE" : "OPERADOR")} opciones={opciones(ROL)} />
-          <Selector
-            name="choferId"
-            etiqueta="Legajo de chofer"
-            valor={usuario?.choferId}
-            vacio="—"
-            opciones={choferes.map((c) => ({ valor: c.id, etiqueta: `${c.apellido}, ${c.nombre} (DNI ${c.dni})` }))}
-            ayuda="Solo para el rol Chofer: define qué viajes ve."
-          />
-          <Selector
-            name="clienteId"
-            etiqueta="Cliente"
-            valor={usuario?.clienteId ?? clienteInicial}
-            vacio="—"
-            opciones={clientes.map((c) => ({ valor: c.id, etiqueta: `${c.razonSocial} (CUIT ${c.cuit})` }))}
-            ayuda="Solo para el rol Cliente: ve únicamente los envíos, fletes y facturas de este cliente."
+          <CamposRol
+            rolInicial={usuario?.rol ?? (clienteInicial ? "CLIENTE" : "OPERADOR")}
+            choferId={usuario?.choferId}
+            clienteId={usuario?.clienteId ?? clienteInicial}
+            choferes={choferes.map((c) => ({ valor: c.id, etiqueta: `${c.apellido}, ${c.nombre} (DNI ${c.dni})` }))}
+            clientes={clientes.map((c) => ({ valor: c.id, etiqueta: `${c.razonSocial} (CUIT ${c.cuit})` }))}
           />
           <Entrada
             name="password"
